@@ -8,6 +8,19 @@ const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
 const app = express();
 const port = process.env.PORT || 5000;
 
+// DB_USER  DB_PASS
+
+const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.ivv8ial.mongodb.net/?retryWrites=true&w=majority`;
+
+// Create a MongoClient with a MongoClientOptions object to set the Stable API version
+const client = new MongoClient(uri, {
+  serverApi: {
+    version: ServerApiVersion.v1,
+    strict: true,
+    deprecationErrors: true,
+  },
+});
+
 // middleware
 app.use(express.json());
 app.use(cookieParser());
@@ -25,7 +38,7 @@ const logger = async (req, res, next) => {
 
 const verifyToken = (req, res, next) => {
   const token = req.cookies?.token;
-  console.log("token: ", token);
+  console.log("token:", token);
 
   if (!token) {
     return res.status(401).send({ message: "unauthorized access" });
@@ -40,19 +53,7 @@ const verifyToken = (req, res, next) => {
   });
 };
 
-// DB_USER  DB_PASS
-
-const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.ivv8ial.mongodb.net/?retryWrites=true&w=majority`;
-
-// Create a MongoClient with a MongoClientOptions object to set the Stable API version
-const client = new MongoClient(uri, {
-  serverApi: {
-    version: ServerApiVersion.v1,
-    strict: true,
-    deprecationErrors: true,
-  },
-});
-
+// ----------main functionality----------------
 async function run() {
   try {
     // Connect the client to the server	(optional starting in v4.7)
@@ -65,7 +66,6 @@ async function run() {
 
     const Rooms = client.db("GoBookHotelDB").collection("roomCollection");
     const bookingCollection = client.db("GoBookHotelDB").collection("bookings");
-    // const CartTable = client.db("CarverseDB").collection("Cart");
 
     // ---------------JWT----------------
     app.post("/jwt", logger, async (req, res) => {
@@ -75,7 +75,7 @@ async function run() {
         expiresIn: "1h",
       });
       res
-        .cookie("token", {
+        .cookie("token", token, {
           httpOnly: true,
           secure: false,
         })
@@ -83,12 +83,12 @@ async function run() {
     });
 
     // ---------------- Getting All Rooms from Collection----------------------
-    app.get("/rooms", async (req, res) => {
+    app.get("/rooms", logger, async (req, res) => {
       try {
         let cursor;
-    
+
         const sortType = req.query.sort;
-    
+
         if (sortType === "asc") {
           cursor = Rooms.find().sort({ price_per_night: 1 });
         } else if (sortType === "desc") {
@@ -96,7 +96,7 @@ async function run() {
         } else {
           cursor = Rooms.find();
         }
-    
+
         const result = await cursor.toArray();
         res.send(result);
       } catch (error) {
@@ -104,32 +104,47 @@ async function run() {
         res.status(500).send({ message: "An error occurred while adding" });
       }
     });
-    
 
-    app.post("/create-booking", verifyToken, async (req, res) => {
-      const booking = req.body;
-      const result = await bookingCollection.insertOne(booking);
+    app.get("/rooms/:id", async (req, res) => {
+      const id = req.params.id;
+      const query = { _id: new ObjectId(id) };
+      const result = await Rooms.findOne(query);
       res.send(result);
     });
+    // ------------------bookings----------------
+    app.post("/bookings", async (req, res) => {
+      try {
+        const bookingItem = req.body;
+        console.log(bookingItem);
 
-    app.get("/bookings", verifyToken, async (req, res) => {
-      const queryEmail = req.query.email;
-      const tokenEmail = req.user.email;
-
-      if (queryEmail !== tokenEmail) {
-        return res.status(403).send({ message: "forbidden access" });
+        const result = await bookingCollection.insertOne(bookingItem);
+        res.send(result);
+      } catch (error) {
+        console.log(error);
+        res.send(error);
       }
+    });
+
+    app.get("/bookings", async (req, res) => {
+      const queryEmail = req.query.email;
+      // const tokenEmail = req.user?.email;
+
+      // if (queryEmail !== tokenEmail) {
+      //   return res.status(403).send({ message: "forbidden access" });
+      // }
       let query = {};
       if (queryEmail) {
         query.email = queryEmail;
       }
-      const result = await bookingCollection.findOne({ email: queryEmail });
+      const result = await bookingCollection.find(query).toArray();
       res.send(result);
     });
 
-    app.delete("cancel-booking/:bookingId", verifyToken, async (req, res) => {
-      const id = req.params.bookingId;
-      const query = { _id: new ObjectId(id) };
+    app.delete("/bookings/:id", async (req, res) => {
+      const id = req.params.id;
+      console.log("delete this ", id);
+      const query = { _id: id };
+      console.log("present ", query);
       const result = await bookingCollection.deleteOne(query);
       res.send(result);
     });
