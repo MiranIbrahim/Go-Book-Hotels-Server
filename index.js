@@ -11,11 +11,17 @@ const port = process.env.PORT || 5000;
 // middleware
 app.use(express.json());
 app.use(cookieParser());
-app.use(cors({
-  origin: 'http://localhost:5173',
-  credentials: true
-}));
+app.use(
+  cors({
+    origin: "http://localhost:5173",
+    credentials: true,
+  })
+);
 
+const logger = async (req, res, next) => {
+  console.log("called:", req.host, req.originalUrl);
+  next();
+};
 
 const verifyToken = (req, res, next) => {
   const token = req.cookies?.token;
@@ -62,7 +68,7 @@ async function run() {
     // const CartTable = client.db("CarverseDB").collection("Cart");
 
     // ---------------JWT----------------
-    app.post("/jwt", verifyToken, async (req, res) => {
+    app.post("/jwt", logger, async (req, res) => {
       const user = req.body;
       console.log(user);
       const token = jwt.sign(user, process.env.ACCESS_TOKEN_SECRET, {
@@ -72,7 +78,6 @@ async function run() {
         .cookie("token", {
           httpOnly: true,
           secure: false,
-          semSite: "none",
         })
         .send({ success: true });
     });
@@ -95,7 +100,7 @@ async function run() {
       res.send(result);
     });
 
-    app.get("/bookings", verifyToken, async(req, res) => {
+    app.get("/bookings", verifyToken, async (req, res) => {
       const queryEmail = req.query.email;
       const tokenEmail = req.user.email;
 
@@ -109,7 +114,6 @@ async function run() {
       const result = await bookingCollection.findOne({ email: queryEmail });
       res.send(result);
     });
-
 
     app.delete("cancel-booking/:bookingId", verifyToken, async (req, res) => {
       const id = req.params.bookingId;
