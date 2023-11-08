@@ -85,7 +85,18 @@ async function run() {
     // ---------------- Getting All Rooms from Collection----------------------
     app.get("/rooms", async (req, res) => {
       try {
-        const cursor = Rooms.find();
+        let cursor;
+    
+        const sortType = req.query.sort;
+    
+        if (sortType === "asc") {
+          cursor = Rooms.find().sort({ price_per_night: 1 });
+        } else if (sortType === "desc") {
+          cursor = Rooms.find().sort({ price_per_night: -1 });
+        } else {
+          cursor = Rooms.find();
+        }
+    
         const result = await cursor.toArray();
         res.send(result);
       } catch (error) {
@@ -93,6 +104,7 @@ async function run() {
         res.status(500).send({ message: "An error occurred while adding" });
       }
     });
+    
 
     app.post("/create-booking", verifyToken, async (req, res) => {
       const booking = req.body;
