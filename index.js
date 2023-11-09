@@ -26,7 +26,10 @@ app.use(express.json());
 app.use(cookieParser());
 app.use(
   cors({
-    origin: "http://localhost:5173",
+    origin: [
+      "https://go-book-hotel.web.app",
+      "https://go-book-hotel.firebaseapp.com",
+    ],
     credentials: true,
   })
 );
@@ -37,7 +40,7 @@ const logger = async (req, res, next) => {
 };
 
 const verifyToken = (req, res, next) => {
-  const token = req.cookies?.token;
+  const token = req.cookies.token;
   console.log("token:", token);
 
   if (!token) {
@@ -66,6 +69,7 @@ async function run() {
 
     const Rooms = client.db("GoBookHotelDB").collection("roomCollection");
     const bookingCollection = client.db("GoBookHotelDB").collection("bookings");
+    const reviewCollection = client.db("GoBookHotelDB").collection("reviews");
 
     // ---------------JWT----------------
     app.post("/jwt", logger, async (req, res) => {
@@ -82,8 +86,14 @@ async function run() {
         .send({ success: true });
     });
 
+    app.post("/logout", async (req, res) => {
+      const user = req.body;
+      console.log("logging out", user);
+      res.clearCookie("token", { maxAge: 0 }).send({ success: true });
+    });
+
     // ---------------- Getting All Rooms from Collection----------------------
-    app.get("/rooms", logger, async (req, res) => {
+    app.get("/rooms", async (req, res) => {
       try {
         let cursor;
 
@@ -112,6 +122,22 @@ async function run() {
       res.send(result);
     });
     // ------------------bookings----------------
+    app.get("/bookings", async (req, res) => {
+      const queryEmail = req.query.email;
+      // const tokenEmail = req.user?.email;
+
+      // if (tokenEmail !== queryEmail) {
+      //   return res.status(403).send({ message: "forbidden access" });
+      // }
+
+      let query = {};
+      if (queryEmail) {
+        query.email = queryEmail;
+      }
+      const result = await bookingCollection.find(query).toArray();
+      res.send(result);
+    });
+
     app.post("/bookings", async (req, res) => {
       try {
         const bookingItem = req.body;
@@ -125,23 +151,42 @@ async function run() {
       }
     });
 
-    app.get("/bookings", async (req, res) => {
-      const queryEmail = req.query.email;
-
-      let query = {};
-      if (queryEmail) {
-        query.email = queryEmail;
-      }
-      const result = await bookingCollection.find(query).toArray();
-      res.send(result);
-    });
-
     app.delete("/bookings/:id", async (req, res) => {
       const id = req.params.id;
       console.log("delete this ", id);
       const query = { _id: id };
       console.log("present ", query);
       const result = await bookingCollection.deleteOne(query);
+      res.send(result);
+    });
+
+    // --------------Revirws---------------------------
+    app.post("/reviews", async (req, res) => {
+      try {
+        const review = req.body;
+        console.log(review);
+
+        const result = await bookingCollection.insertOne(review);
+        res.send(result);
+      } catch (error) {
+        console.log(error);
+        res.send(error);
+      }
+    });
+
+    app.get("/review", async (req, res) => {
+      const queryId = req.query.id;
+      // const tokenEmail = req.user?.email;
+
+      // if (tokenEmail !== queryEmail) {
+      //   return res.status(403).send({ message: "forbidden access" });
+      // }
+
+      let query = {};
+      if (queryId) {
+        query.id = queryId;
+      }
+      const result = await reviewCollection.find(query).toArray();
       res.send(result);
     });
   } finally {
